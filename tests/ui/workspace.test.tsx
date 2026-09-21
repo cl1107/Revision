@@ -36,21 +36,7 @@ async function waitFor(predicate: () => boolean): Promise<void> {
   throw new Error('timed out');
 }
 
-function click(
-  renderer: {
-    findByTestId: (id: string) => { id: number } | undefined;
-    getElementBounds: (id: number) => number[] | null;
-    nativeSimulateClick: (x: number, y: number) => void;
-  },
-  testId: string,
-) {
-  const node = renderer.findByTestId(testId);
-  expect(node).toBeTruthy();
-  const bounds = node ? renderer.getElementBounds(node.id) : null;
-  expect(bounds).toBeTruthy();
-  if (!bounds) return;
-  renderer.nativeSimulateClick(bounds[0] + bounds[2] / 2, bounds[1] + bounds[3] / 2);
-}
+import { simulateClick as click } from '../helpers';
 
 describe('Workspace switcher', () => {
   test('可切换 recent working copy', async () => {

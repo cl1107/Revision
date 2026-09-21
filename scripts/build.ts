@@ -165,7 +165,9 @@ async function main(): Promise<void> {
   await compileBinary();
 
   if (process.platform === 'darwin') {
+    run('codesign', ['--force', '--sign', '-', binary]);
     await wrapMacApp(packageJson.version);
+    run('codesign', ['--force', '--deep', '--sign', '-', appBundle]);
     console.log(`Built ${path.relative(root, binary)} and ${path.relative(root, appBundle)}`);
     return;
   }

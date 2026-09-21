@@ -3,6 +3,8 @@ import { createTestRoot, hasNativeTestRenderer } from '@gpuix/react/testing';
 import { CheckoutDialog } from '../../src/features/welcome/CheckoutDialog';
 import { WelcomeScreen } from '../../src/features/welcome/WelcomeScreen';
 
+import { simulateClick } from '../helpers';
+
 describe('Checkout Dialog', () => {
   test('Welcome 点 Checkout 会打开 dialog', () => {
     if (!hasNativeTestRenderer) return;
@@ -20,12 +22,7 @@ describe('Checkout Dialog', () => {
         />,
       );
       renderer.flush();
-      const button = renderer.findByTestId('checkout-repository-button');
-      expect(button).toBeTruthy();
-      const bounds = button ? renderer.getElementBounds(button.id) : null;
-      expect(bounds).toBeTruthy();
-      if (!bounds) return;
-      renderer.nativeSimulateClick(bounds[0] + bounds[2] / 2, bounds[1] + bounds[3] / 2);
+      simulateClick(renderer, 'checkout-repository-button');
       renderer.flush();
       expect(opened).toBe(1);
     } finally {
@@ -61,12 +58,7 @@ describe('Checkout Dialog', () => {
       renderer.flush();
       expect(renderer.findByTestId('checkout-dialog')).toBeTruthy();
       expect(renderer.getAllText()).toContain("svn: E170000: URL doesn't exist");
-      const cancel = renderer.findByTestId('checkout-cancel');
-      expect(cancel).toBeTruthy();
-      const bounds = cancel ? renderer.getElementBounds(cancel.id) : null;
-      expect(bounds).toBeTruthy();
-      if (!bounds) return;
-      renderer.nativeSimulateClick(bounds[0] + bounds[2] / 2, bounds[1] + bounds[3] / 2);
+      simulateClick(renderer, 'checkout-cancel');
       renderer.flush();
       expect(cancelled).toBe(1);
     } finally {

@@ -24,6 +24,8 @@ function PanelHarness() {
   );
 }
 
+import { getBoundsDimensions, simulateClick } from '../helpers';
+
 describe('ChangesPanel', () => {
   test('checkbox 与 row select 分离', () => {
     if (!hasNativeTestRenderer) return;
@@ -32,12 +34,7 @@ describe('ChangesPanel', () => {
       render(<PanelHarness />);
       renderer.flush();
       expect(renderer.getAllText()).toContain('1 selected');
-      const checkbox = renderer.findByTestId('check-scratch.txt');
-      expect(checkbox).toBeTruthy();
-      const bounds = renderer.getElementBounds(checkbox!.id);
-      expect(bounds).toBeTruthy();
-      const [x, y, w, h] = bounds as number[];
-      renderer.nativeSimulateClick(x + w / 2, y + h / 2);
+      simulateClick(renderer, 'check-scratch.txt');
       renderer.flush();
       expect(renderer.getAllText()).toContain('2 selected');
       expect(renderer.getAllText()).toContain('src/a.ts');
@@ -61,9 +58,8 @@ describe('ChangesPanel', () => {
       expect(panelBounds).toBeTruthy();
       expect(rowBounds).toBeTruthy();
       if (!panelBounds || !rowBounds) return;
-      const panelWidth = panelBounds[2];
-      const rowX = rowBounds[0];
-      const rowWidth = rowBounds[2];
+      const { width: panelWidth } = getBoundsDimensions(panelBounds);
+      const { x: rowX, width: rowWidth } = getBoundsDimensions(rowBounds);
       expect(rowWidth).toBeGreaterThan(360);
       expect(rowWidth).toBeGreaterThan(panelWidth - 24);
       expect(rowX).toBeGreaterThanOrEqual(0);
