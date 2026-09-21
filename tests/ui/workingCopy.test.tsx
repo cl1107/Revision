@@ -4,6 +4,8 @@ import { RepositoryScreen } from '../../src/features/repository/RepositoryScreen
 import type { Repository } from '../../src/domain/repository';
 import type { PathOpener } from '../../src/services/platform/pathOpener';
 
+import { simulateClick } from '../helpers';
+
 const repo: Repository = {
   rootPath: '/tmp/demo-wc',
   repositoryUrl: 'https://svn.example.com/repos/app/trunk',
@@ -72,12 +74,16 @@ describe('Working Copy page', () => {
     try {
       const opened: string[] = [];
       const revealed: string[][] = [];
+      const openedInVsCode: string[] = [];
       const mockOpener: PathOpener = {
         async openPath(path) {
           opened.push(path);
         },
         async revealPaths(paths) {
           revealed.push([...paths]);
+        },
+        async openInVsCode(path) {
+          openedInVsCode.push(path);
         },
       };
 
@@ -109,19 +115,22 @@ describe('Working Copy page', () => {
       renderer.flush();
 
       expect(renderer.findByTestId('working-copy-show-in-finder')).toBeTruthy();
+      expect(renderer.findByTestId('working-copy-open-in-vscode')).toBeTruthy();
       expect(renderer.getAllText()).toContain('Show in Finder');
+      expect(renderer.getAllText()).toContain('Open with VS Code');
       expect(renderer.findByTestId('reveal-in-finder')).toBeTruthy();
       expect(renderer.findByTestId('show-in-finder')).toBeUndefined();
 
-      const action = renderer.findByTestId('working-copy-show-in-finder');
-      const bounds = renderer.getElementBounds(action!.id);
-      expect(bounds).toBeTruthy();
-      const [x, y, w, h] = bounds as number[];
-      renderer.nativeSimulateClick(x + w / 2, y + h / 2);
+      simulateClick(renderer, 'working-copy-show-in-finder');
       renderer.flush();
 
       expect(opened).toEqual(['/tmp/demo-wc']);
       expect(revealed).toEqual([]);
+
+      simulateClick(renderer, 'working-copy-open-in-vscode');
+      renderer.flush();
+
+      expect(openedInVsCode).toEqual(['/tmp/demo-wc']);
     } finally {
       unmount();
     }

@@ -89,4 +89,66 @@ describe('MacOSPathOpener', () => {
     await opener.revealPaths([]);
     expect(ran).toBe(false);
   });
+
+  test('openInVsCode calls runner with open -b com.microsoft.VSCode <absolutePath>', async () => {
+    let capturedRequest: CommandRequest | null = null;
+    const opener = new MacOSPathOpener(
+      new FakeRunner(async (request) => {
+        capturedRequest = request;
+        return { exitCode: 0, stdout: '', stderr: '' };
+      }) as never,
+    );
+
+    await opener.openInVsCode('/Users/alice/projects/repo/src/index.ts');
+
+    expect(capturedRequest).not.toBeNull();
+    expect(capturedRequest!.argv).toEqual(['open', '-b', 'com.microsoft.VSCode', '/Users/alice/projects/repo/src/index.ts']);
+  });
+
+  test('openInVsCode with ~ expands home directory', async () => {
+    let capturedRequest: CommandRequest | null = null;
+    const opener = new MacOSPathOpener(
+      new FakeRunner(async (request) => {
+        capturedRequest = request;
+        return { exitCode: 0, stdout: '', stderr: '' };
+      }) as never,
+    );
+
+    await opener.openInVsCode('~/work/frontend-web');
+
+    expect(capturedRequest).not.toBeNull();
+    expect(capturedRequest!.argv).toEqual(['open', '-b', 'com.microsoft.VSCode', join(homedir(), 'work/frontend-web')]);
+  });
+
+  test('openInVsCode falls back to open -a "Visual Studio Code" if -b fails', async () => {
+    const requests: CommandRequest[] = [];
+    const opener = new MacOSPathOpener(
+      new FakeRunner(async (request) => {
+        requests.push(request);
+        if (request.argv[1] === '-b') {
+          throw new Error('Application not found');
+        }
+        return { exitCode: 0, stdout: '', stderr: '' };
+      }) as never,
+    );
+
+    await opener.openInVsCode('/tmp/my-project');
+
+    expect(requests).toHaveLength(2);
+    expect(requests[0].argv).toEqual(['open', '-b', 'com.microsoft.VSCode', '/tmp/my-project']);
+    expect(requests[1].argv).toEqual(['open', '-a', 'Visual Studio Code', '/tmp/my-project']);
+  });
+
+  test('openInVsCode with empty string does not run command', async () => {
+    let ran = false;
+    const opener = new MacOSPathOpener(
+      new FakeRunner(async () => {
+        ran = true;
+        return { exitCode: 0, stdout: '', stderr: '' };
+      }) as never,
+    );
+
+    await opener.openInVsCode('   ');
+    expect(ran).toBe(false);
+  });
 });

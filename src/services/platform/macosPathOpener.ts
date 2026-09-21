@@ -1,14 +1,8 @@
-import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { resolveAbsolutePath } from '../../domain/editor';
 import type { CommandRunner } from '../svn/commandRunner';
 import type { PathOpener } from './pathOpener';
 
-export function resolveAbsolutePath(path: string, home = homedir()): string {
-  const trimmed = path.trim();
-  if (trimmed === '~') return home;
-  if (trimmed.startsWith('~/')) return join(home, trimmed.slice(2));
-  return trimmed;
-}
+export { resolveAbsolutePath };
 
 export class MacOSPathOpener implements PathOpener {
   constructor(private readonly runner: CommandRunner) {}
@@ -27,6 +21,20 @@ export class MacOSPathOpener implements PathOpener {
     await this.runner.run({
       argv: ['open', '-R', ...targets],
     });
+  }
+
+  async openInVsCode(path: string): Promise<void> {
+    const target = resolveAbsolutePath(path);
+    if (!target) return;
+    try {
+      await this.runner.run({
+        argv: ['open', '-b', 'com.microsoft.VSCode', target],
+      });
+    } catch {
+      await this.runner.run({
+        argv: ['open', '-a', 'Visual Studio Code', target],
+      });
+    }
   }
 }
 

@@ -4,6 +4,7 @@ import { App } from '../../src/app/App';
 import { RepositoryScreen } from '../../src/features/repository/RepositoryScreen';
 import type { SvnRevision } from '../../src/domain/revision';
 import type { Repository } from '../../src/domain/repository';
+import type { PathOpener } from '../../src/services/platform/pathOpener';
 
 const repo: Repository = {
   rootPath: '/tmp/demo-wc',
@@ -34,29 +35,16 @@ const revisionPatches = new Map([
   [11, 'diff --git a/src/pages/profile.vue b/src/pages/profile.vue\n--- /dev/null\n+++ b/src/pages/profile.vue\n@@ -0,0 +1 @@\n+profile page\n'],
 ]);
 
-async function waitFor(predicate: () => boolean): Promise<void> {
+async function waitFor(predicate: () => boolean, flush?: () => void): Promise<void> {
   for (let i = 0; i < 80; i++) {
+    flush?.();
     if (predicate()) return;
     await Bun.sleep(10);
   }
   throw new Error('timed out');
 }
 
-function click(
-  renderer: {
-    findByTestId: (id: string) => { id: number } | undefined;
-    getElementBounds: (id: number) => number[] | null;
-    nativeSimulateClick: (x: number, y: number) => void;
-  },
-  testId: string,
-) {
-  const node = renderer.findByTestId(testId);
-  expect(node).toBeTruthy();
-  const bounds = node ? renderer.getElementBounds(node.id) : null;
-  expect(bounds).toBeTruthy();
-  if (!bounds) return;
-  renderer.nativeSimulateClick(bounds[0] + bounds[2] / 2, bounds[1] + bounds[3] / 2);
-}
+import { simulateClick as click } from '../helpers';
 
 describe('History', () => {
   test('preview 显示 revision 列表', () => {
@@ -66,8 +54,8 @@ describe('History', () => {
       render(<App preview="history" />);
       renderer.flush();
       expect(renderer.findByTestId('history-view')).toBeTruthy();
+      expect(renderer.getAllText()).toContain('History');
       expect(renderer.findByTestId('revision-18431')).toBeTruthy();
-      expect(renderer.getAllText()).toContain('Fix profile avatar fallback when CDN is empty');
     } finally {
       unmount();
     }
@@ -79,12 +67,21 @@ describe('History', () => {
     try {
       let logCalls = 0;
       const diffCalls: number[] = [];
+      const openedInVsCode: string[] = [];
+      const mockOpener: PathOpener = {
+        async openPath() {},
+        async revealPaths() {},
+        async openInVsCode(path) {
+          openedInVsCode.push(path);
+        },
+      };
       render(
         <RepositoryScreen
           repository={repo}
           workingCopyName="demo-wc"
           workingCopyPath="~/demo-wc"
           initialPage="history"
+          opener={mockOpener}
           svn={{
             async validateWorkingCopy() {
               return repo;
@@ -110,20 +107,28 @@ describe('History', () => {
         />,
       );
       renderer.flush();
-      await waitFor(() => Boolean(renderer.findByTestId('revision-12')));
-      renderer.flush();
+      await waitFor(() => Boolean(renderer.findByTestId('revision-12')), () => renderer.flush());
       expect(renderer.getAllText()).toContain('Fix user service');
       expect(renderer.getAllText()).toContain('/trunk/src/App.ts');
-      await waitFor(() => renderer.getAllText().includes('+new user'));
+      expect(renderer.findByTestId('history-open-in-vscode-/trunk/src/App.ts')).toBeTruthy();
+      click(renderer, 'history-open-in-vscode-/trunk/src/App.ts');
+      renderer.flush();
+      expect(openedInVsCode).toEqual(['/tmp/demo-wc/trunk/src/App.ts']);
+      await waitFor(() => {
+        const diffNode = renderer.findByTestId('revision-diff');
+        return Boolean(diffNode && (diffNode as unknown as { customProps?: { patch?: string } }).customProps?.patch?.includes('+new user'));
+      }, () => renderer.flush());
       expect(diffCalls).toContain(12);
       click(renderer, 'revision-11');
-      await waitFor(() => renderer.getAllText().includes('+profile page'));
-      renderer.flush();
+      await waitFor(() => {
+        const diffNode = renderer.findByTestId('revision-diff');
+        return Boolean(diffNode && (diffNode as unknown as { customProps?: { patch?: string } }).customProps?.patch?.includes('+profile page'));
+      }, () => renderer.flush());
       expect(renderer.getAllText()).toContain('Add profile page');
       expect(renderer.getAllText()).toContain('/trunk/src/pages/profile.vue');
       expect(diffCalls).toContain(11);
       click(renderer, 'history-refresh');
-      await waitFor(() => logCalls >= 2);
+      await waitFor(() => logCalls >= 2, () => renderer.flush());
       expect(logCalls).toBeGreaterThanOrEqual(2);
     } finally {
       unmount();

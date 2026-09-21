@@ -18,6 +18,7 @@ import {
 } from '../../application/mutateWorkingCopy';
 import type { OperationManager } from '../../application/operationManager';
 import { refreshWorkingCopy, type WorkingCopyReader } from '../../application/refreshRepository';
+import { openInVsCode } from '../../application/openInVsCode';
 import type { PathOpener } from '../../services/platform/pathOpener';
 import { Dialog } from '../../components/Dialog';
 import { ErrorBanner } from '../../components/ErrorBanner';
@@ -192,13 +193,18 @@ export function RepositoryScreen({
     [rootPath, store, svn],
   );
 
+  const activeRootRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (!live || !rootPath) return;
-    store.getState().resetWorkingCopy(repository);
-    setDiffView({ state: 'idle' });
-    setRevisionDiffView({ state: 'idle' });
-    diffCacheRef.current.clear();
-    revisionDiffCacheRef.current.clear();
+    if (activeRootRef.current !== null && activeRootRef.current !== rootPath) {
+      store.getState().resetWorkingCopy(repository);
+      setDiffView({ state: 'idle' });
+      setRevisionDiffView({ state: 'idle' });
+      diffCacheRef.current.clear();
+      revisionDiffCacheRef.current.clear();
+    }
+    activeRootRef.current = rootPath;
     void runRefresh();
     return () => {
       abortRef.current?.abort();
@@ -378,6 +384,19 @@ export function RepositoryScreen({
     if (!opener || targets.length === 0) return;
     void opener.revealPaths(targets).catch((error) => {
       console.error('Failed to reveal path in Finder', error);
+    });
+  };
+
+  const handleOpenInVsCode = (targetPath?: string) => {
+    const root = rootPath || workingCopyPath;
+    if (!opener || !root) return;
+    void openInVsCode(opener, {
+      rootPath: root,
+      targetPath,
+      repositoryUrl: liveRepo?.repositoryUrl ?? repository?.repositoryUrl,
+      repositoryRoot: liveRepo?.repositoryRoot ?? repository?.repositoryRoot,
+    }).catch((error) => {
+      console.error('Failed to open in VS Code', error);
     });
   };
 
@@ -579,6 +598,7 @@ export function RepositoryScreen({
         <HistoryView
           onRefresh={() => void runHistoryRefresh()}
           diffView={live ? revisionDiffView : fixtureRevisionDiffView(selectedRevision)}
+          onOpenPathInVsCode={opener && (rootPath || workingCopyPath) ? (path) => handleOpenInVsCode(path) : undefined}
         />
       ) : page === 'working-copy' ? (
         <WorkingCopyView
@@ -588,6 +608,7 @@ export function RepositoryScreen({
           onRefresh={() => void runRefresh()}
           onUpdate={runUpdate}
           onShowInFinder={opener && (rootPath || workingCopyPath) ? showWorkingCopyInFinder : undefined}
+          onOpenInVsCode={opener && (rootPath || workingCopyPath) ? () => handleOpenInVsCode() : undefined}
         />
       ) : (
         <>
@@ -599,6 +620,11 @@ export function RepositoryScreen({
             change={selectedChange}
             view={live ? diffView : fixtureDiffView(selectedChange)}
             mutating={busy}
+            onOpenInVsCode={
+              opener && selectedChange
+                ? () => handleOpenInVsCode(selectedChange.absolutePath || selectedChange.path)
+                : undefined
+            }
             onAdd={
               selectedChange && isAddable(selectedChange)
                 ? () => {

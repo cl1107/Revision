@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { describe, expect, test } from 'bun:test';
 import { createTestRoot, hasNativeTestRenderer } from '@gpuix/react/testing';
 import { DiffPanel, type DiffView } from '../../src/features/changes/DiffPanel';
+import { simulateClick } from '../helpers';
 import { RepositoryScreen } from '../../src/features/repository/RepositoryScreen';
 import type { WorkingCopyChange } from '../../src/domain/change';
 import type { DiffResult } from '../../src/domain/diff';
 import type { Repository } from '../../src/domain/repository';
+import type { PathOpener } from '../../src/services/platform/pathOpener';
 
 const repo: Repository = {
   rootPath: '/tmp/demo-wc',
@@ -28,8 +30,9 @@ const textPatch = `diff --git a/a.ts b/a.ts
 +new
 `;
 
-async function waitFor(predicate: () => boolean): Promise<void> {
+async function waitFor(predicate: () => boolean, flush?: () => void): Promise<void> {
   for (let i = 0; i < 80; i++) {
+    flush?.();
     if (predicate()) return;
     await Bun.sleep(10);
   }
@@ -115,15 +118,9 @@ describe('DiffPanel', () => {
           }}
         />,
       );
-      renderer.flush();
-      await waitFor(() => renderer.getAllText().includes('Loading diff…'));
-      const refresh = renderer.findByTestId('refresh-button');
-      expect(refresh).toBeTruthy();
-      const bounds = refresh ? renderer.getElementBounds(refresh.id) : null;
-      expect(bounds).toBeTruthy();
-      if (!bounds) return;
-      renderer.nativeSimulateClick(bounds[0] + bounds[2] / 2, bounds[1] + bounds[3] / 2);
-      await waitFor(() => renderer.getAllText().includes('This file is binary. Unified diff is not available.'));
+      await waitFor(() => renderer.getAllText().includes('Loading diff…'), () => renderer.flush());
+      simulateClick(renderer, 'refresh-button');
+      await waitFor(() => renderer.getAllText().includes('This file is binary. Unified diff is not available.'), () => renderer.flush());
       resolveA({ kind: 'text', patch: textPatch });
       await Bun.sleep(30);
       renderer.flush();
@@ -144,6 +141,57 @@ describe('DiffPanel', () => {
       renderer.flush();
       expect(renderer.getAllText()).toContain('Unversioned file. Add this file to SVN to include it in a commit.');
       expect(renderer.findByTestId('add-unversioned')).toBeTruthy();
+    } finally {
+      unmount();
+    }
+  });
+
+  test('DiffPanel header 包含 Open with VS Code 按钮且点击打开当前文件', async () => {
+    if (!hasNativeTestRenderer) return;
+    const { render, renderer, unmount } = createTestRoot({ width: 1440, height: 960 });
+    try {
+      const openedInVsCode: string[] = [];
+      const mockOpener: PathOpener = {
+        async openPath() {},
+        async revealPaths() {},
+        async openInVsCode(path) {
+          openedInVsCode.push(path);
+        },
+      };
+
+      render(
+        <RepositoryScreen
+          repository={repo}
+          workingCopyName="demo-wc"
+          workingCopyPath="~/demo-wc"
+          opener={mockOpener}
+          svn={{
+            async validateWorkingCopy() {
+              return repo;
+            },
+            async getStatus() {
+              return changes;
+            },
+            async getDiff() {
+              return { kind: 'text' as const, patch: textPatch };
+            },
+          }}
+        />,
+      );
+      renderer.flush();
+      await waitFor(() => Boolean(renderer.findByTestId('change-a.ts')));
+      simulateClick(renderer, 'change-a.ts');
+      renderer.flush();
+      await waitFor(() => Boolean(renderer.findByTestId('diff-open-in-vscode')));
+      renderer.flush();
+
+      expect(renderer.findByTestId('diff-open-in-vscode')).toBeTruthy();
+      expect(renderer.getAllText()).toContain('Open with VS Code');
+
+      simulateClick(renderer, 'diff-open-in-vscode');
+      renderer.flush();
+
+      expect(openedInVsCode).toEqual(['/tmp/demo-wc/a.ts']);
     } finally {
       unmount();
     }

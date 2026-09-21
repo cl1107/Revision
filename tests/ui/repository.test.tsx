@@ -8,6 +8,7 @@ import type { Repository } from '../../src/domain/repository';
 import type { PathOpener } from '../../src/services/platform/pathOpener';
 import { RepositoryStoreProvider } from '../../src/store/RepositoryStoreContext';
 import { createRepositoryStore } from '../../src/store/repositoryStore';
+import { simulateClick } from '../helpers';
 
 const liveRepo: Repository = {
   rootPath: '/tmp/demo-wc',
@@ -90,12 +91,7 @@ describe('Figma 主界面', () => {
       expect(texts).toContain('2 files');
       expect(texts).toContain('2 local changes');
 
-      const refresh = renderer.findByTestId('refresh-button');
-      expect(refresh).toBeTruthy();
-      const bounds = renderer.getElementBounds(refresh!.id);
-      expect(bounds).toBeTruthy();
-      const [x, y, w, h] = bounds as number[];
-      renderer.nativeSimulateClick(x + w / 2, y + h / 2);
+      simulateClick(renderer, 'refresh-button');
       await waitFor(() => statusCalls >= 2);
       renderer.flush();
       expect(statusCalls).toBeGreaterThanOrEqual(2);
@@ -128,6 +124,7 @@ describe('Figma 主界面', () => {
         async revealPaths(paths) {
           revealed.push([...paths]);
         },
+        async openInVsCode() {},
       };
 
       render(
@@ -154,11 +151,7 @@ describe('Figma 主界面', () => {
       await waitFor(() => Boolean(renderer.findByTestId('select-src/a.ts')));
       renderer.flush();
 
-      const row = renderer.findByTestId('select-src/a.ts');
-      const rowBounds = renderer.getElementBounds(row!.id);
-      expect(rowBounds).toBeTruthy();
-      const [rx, ry, rw, rh] = rowBounds as number[];
-      renderer.nativeSimulateClick(rx + rw / 2, ry + rh / 2);
+      simulateClick(renderer, 'select-src/a.ts');
       renderer.flush();
 
       const action = renderer.findByTestId('reveal-in-finder');
@@ -166,10 +159,7 @@ describe('Figma 主界面', () => {
       expect(renderer.getAllText()).toContain('Reveal in Finder');
       expect(renderer.findByTestId('show-in-finder')).toBeUndefined();
 
-      const bounds = renderer.getElementBounds(action!.id);
-      expect(bounds).toBeTruthy();
-      const [x, y, w, h] = bounds as number[];
-      renderer.nativeSimulateClick(x + w / 2, y + h / 2);
+      simulateClick(renderer, 'reveal-in-finder');
       renderer.flush();
 
       expect(revealed).toEqual([['/tmp/demo-wc/src/a.ts']]);
@@ -211,10 +201,7 @@ describe('Figma 主界面', () => {
       const action = renderer.findByTestId('reveal-in-finder');
       expect(action).toBeTruthy();
 
-      const bounds = renderer.getElementBounds(action!.id);
-      expect(bounds).toBeTruthy();
-      const [x, y, w, h] = bounds as number[];
-      renderer.nativeSimulateClick(x + w / 2, y + h / 2);
+      simulateClick(renderer, 'reveal-in-finder');
       renderer.flush();
 
       expect(revealed).toEqual([['/tmp/demo-wc/src/a.ts']]);

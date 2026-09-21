@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { Icon } from '../../app/icons';
 import { font, layout, type ThemeTokens } from '../../app/theme';
 import { Button } from '../../components/Button';
+import { OpenInVsCodeButton } from '../../components/OpenInVsCodeButton';
 import { ErrorBanner } from '../../components/ErrorBanner';
 import type { RevisionDiffResult } from '../../domain/diff';
 import type { AppError } from '../../domain/error';
@@ -39,9 +40,11 @@ export type RevisionDiffView =
 export function HistoryView({
   onRefresh,
   diffView = { state: 'idle' },
+  onOpenPathInVsCode,
 }: {
   onRefresh: () => void;
   diffView?: RevisionDiffView;
+  onOpenPathInVsCode?: (path: string) => void;
 }) {
 
   const theme = useTheme();
@@ -241,10 +244,36 @@ export function HistoryView({
               selected.changedPaths.map((path) => (
                 <div
                   key={`${path.action}-${path.path}`}
-                  style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 8 }}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 8,
+                    minHeight: 34,
+                  }}
                 >
-                  <ActionBadge action={path.action} />
-                  <text style={{ color: theme.text, fontSize: 13, fontFamily: font.mono }}>{path.path}</text>
+                  <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 8, flexGrow: 1, minWidth: 0 }}>
+                    <ActionBadge action={path.action} />
+                    <text
+                      style={{
+                        color: theme.text,
+                        fontSize: 13,
+                        fontFamily: font.mono,
+                        whiteSpace: 'nowrap',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {path.path}
+                    </text>
+                  </div>
+                  {onOpenPathInVsCode ? (
+                    <OpenInVsCodeButton
+                      size="sm"
+                      onClick={() => onOpenPathInVsCode(path.path)}
+                      testId={`history-open-in-vscode-${path.path}`}
+                    />
+                  ) : null}
                 </div>
               ))
             )}

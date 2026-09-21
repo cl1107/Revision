@@ -1,6 +1,7 @@
 import { useResolvedAppearance, useTheme } from '../../app/ThemeContext';
 import { font } from '../../app/theme';
 import { Button } from '../../components/Button';
+import { OpenInVsCodeButton } from '../../components/OpenInVsCodeButton';
 import { ErrorBanner } from '../../components/ErrorBanner';
 import { STATUS_LABEL, type WorkingCopyChange } from '../../domain/change';
 import { countPatchLines, type DiffResult } from '../../domain/diff';
@@ -16,6 +17,7 @@ export function DiffPanel({
   change,
   view,
   mutating,
+  onOpenInVsCode,
   onAdd,
   onRevert,
   onDelete,
@@ -23,6 +25,7 @@ export function DiffPanel({
   change: WorkingCopyChange | null;
   view: DiffView;
   mutating?: boolean;
+  onOpenInVsCode?: () => void;
   onAdd?: () => void;
   onRevert?: () => void;
   onDelete?: () => void;
@@ -80,6 +83,12 @@ export function DiffPanel({
             {subtitle({ change, result, stats, loading })}
           </text>
         </div>
+        <OpenInVsCodeButton
+          size="sm"
+          disabled={!change || !onOpenInVsCode}
+          onClick={onOpenInVsCode}
+          testId="diff-open-in-vscode"
+        />
         <Button
           label="Revert file"
           variant="secondary"

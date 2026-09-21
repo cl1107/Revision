@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { useTheme } from '../../app/ThemeContext';
 import { font } from '../../app/theme';
 import { Button } from '../../components/Button';
+import { OpenInVsCodeButton } from '../../components/OpenInVsCodeButton';
 import { ErrorBanner } from '../../components/ErrorBanner';
 import { StatusBadge } from '../../components/StatusBadge';
 import { STATUS_LABEL, type SvnChangeStatus } from '../../domain/change';
@@ -34,6 +35,7 @@ export function WorkingCopyView({
   onRefresh,
   onUpdate,
   onShowInFinder,
+  onOpenInVsCode,
 }: {
   workingCopyName: string;
   workingCopyPath: string;
@@ -41,6 +43,7 @@ export function WorkingCopyView({
   onRefresh: () => void;
   onUpdate: () => void;
   onShowInFinder?: () => void;
+  onOpenInVsCode?: () => void;
 }) {
   const theme = useTheme();
   const repository = useRepositoryStore(selectRepository);
@@ -124,14 +127,24 @@ export function WorkingCopyView({
             mono
             testId="working-copy-local-path"
             action={
-              onShowInFinder ? (
-                <Button
-                  label="Show in Finder"
-                  variant="secondary"
-                  size="sm"
-                  onClick={onShowInFinder}
-                  testId="working-copy-show-in-finder"
-                />
+              onShowInFinder || onOpenInVsCode ? (
+                <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  {onShowInFinder ? (
+                    <Button
+                      label="Show in Finder"
+                      variant="secondary"
+                      size="sm"
+                      onClick={onShowInFinder}
+                      testId="working-copy-show-in-finder"
+                    />
+                  ) : null}
+                  {onOpenInVsCode ? (
+                    <OpenInVsCodeButton
+                      onClick={onOpenInVsCode}
+                      testId="working-copy-open-in-vscode"
+                    />
+                  ) : null}
+                </div>
               ) : null
             }
           />
