@@ -36,3 +36,22 @@ export function resolveEditorTargetPath(input: {
   const cleanRelative = trimmed.replace(/^\/+/, '');
   return join(base, cleanRelative);
 }
+
+export function buildSvnPegUrl(
+  repositoryRoot: string | undefined,
+  targetPath: string,
+  revision: number,
+): string {
+  const clean = targetPath.trim();
+  if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('svn://')) {
+    const [baseUrl] = clean.split('@');
+    return `${baseUrl}@${revision}`;
+  }
+  if (repositoryRoot) {
+    const root = repositoryRoot.replace(/\/+$/, '');
+    const rel = clean.replace(/^\/+/, '');
+    return `${root}/${rel}@${revision}`;
+  }
+  const cleanRel = clean.replace(/^\/+/, '');
+  return `^/${cleanRel}@${revision}`;
+}

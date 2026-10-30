@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { createTestRoot, hasNativeTestRenderer } from '@gpuix/react/testing';
 import { App } from '../../src/app/App';
 import { RepositoryScreen } from '../../src/features/repository/RepositoryScreen';
@@ -65,9 +66,12 @@ describe('History', () => {
     if (!hasNativeTestRenderer) return;
     const { render, renderer, unmount } = createTestRoot({ width: 1440, height: 960 });
     try {
+      mkdirSync('/tmp/demo-wc/trunk/src', { recursive: true });
+      writeFileSync('/tmp/demo-wc/trunk/src/App.ts', 'console.log("app");');
       let logCalls = 0;
       const diffCalls: number[] = [];
       const openedInVsCode: string[] = [];
+      const catCalls: string[] = [];
       const mockOpener: PathOpener = {
         async openPath() {},
         async revealPaths() {},
@@ -103,6 +107,10 @@ describe('History', () => {
               expect(options?.limit ?? 100).toBe(100);
               return revisions;
             },
+            async catRevision(_root, target, _rev) {
+              catCalls.push(target);
+              return '<template><div>profile</div></template>';
+            },
           }}
         />,
       );
@@ -127,10 +135,15 @@ describe('History', () => {
       expect(renderer.getAllText()).toContain('Add profile page');
       expect(renderer.getAllText()).toContain('/trunk/src/pages/profile.vue');
       expect(diffCalls).toContain(11);
+      click(renderer, 'history-open-in-vscode-/trunk/src/pages/profile.vue');
+      await waitFor(() => openedInVsCode.length >= 2, () => renderer.flush());
+      expect(catCalls).toContain('file:///repo/trunk/src/pages/profile.vue@11');
+      expect(openedInVsCode[1]).toContain('/Revision/snapshots/r11/trunk/src/pages/profile.vue');
       click(renderer, 'history-refresh');
       await waitFor(() => logCalls >= 2, () => renderer.flush());
       expect(logCalls).toBeGreaterThanOrEqual(2);
     } finally {
+      rmSync('/tmp/demo-wc', { recursive: true, force: true });
       unmount();
     }
   });

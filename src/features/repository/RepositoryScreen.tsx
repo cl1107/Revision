@@ -18,7 +18,7 @@ import {
 } from '../../application/mutateWorkingCopy';
 import type { OperationManager } from '../../application/operationManager';
 import { refreshWorkingCopy, type WorkingCopyReader } from '../../application/refreshRepository';
-import { openInVsCode } from '../../application/openInVsCode';
+import { openInVsCode, type RevisionSnapshotProvider } from '../../application/openInVsCode';
 import type { PathOpener } from '../../services/platform/pathOpener';
 import { Dialog } from '../../components/Dialog';
 import { ErrorBanner } from '../../components/ErrorBanner';
@@ -65,7 +65,13 @@ import { WorkingCopyView } from './WorkingCopyView';
 
 export type RepositorySvn = WorkingCopyReader &
   DiffReader &
-  Partial<CommitClient & WorkingCopyMutator & HistoryReader & RevisionDiffReader>;
+  Partial<
+    CommitClient &
+      WorkingCopyMutator &
+      HistoryReader &
+      RevisionDiffReader &
+      RevisionSnapshotProvider
+  >;
 
 type ConfirmKind = 'revert' | 'delete';
 
@@ -146,6 +152,7 @@ export function RepositoryScreen({
   const [diffView, setDiffView] = useState<DiffView>({ state: 'idle' });
   const [revisionDiffView, setRevisionDiffView] = useState<RevisionDiffView>({ state: 'idle' });
   const [confirm, setConfirm] = useState<{ kind: ConfirmKind; targets: WorkingCopyChange[] } | null>(null);
+  const [openError, setOpenError] = useState<AppError | null>(null);
 
   const generationRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
@@ -245,6 +252,16 @@ export function RepositoryScreen({
       historyAbortRef.current?.abort();
     };
   }, [live, page, runHistoryRefresh]);
+
+  // 首次进入由 root 的 refresh effect 负责。这里只在从其他页面切回 Changes 时再刷一次。
+  const seenPageRef = useRef<RepositoryPage | null>(null);
+  useEffect(() => {
+    if (!live) return;
+    const previous = seenPageRef.current;
+    seenPageRef.current = page;
+    if (page !== 'changes' || previous === null || previous === 'changes') return;
+    void runRefresh();
+  }, [live, page, runRefresh]);
 
   useEffect(() => {
     revisionDiffAbortRef.current?.abort();
@@ -387,16 +404,25 @@ export function RepositoryScreen({
     });
   };
 
-  const handleOpenInVsCode = (targetPath?: string) => {
+  const handleOpenInVsCode = (
+    targetPath?: string,
+    revision?: number,
+    action?: 'A' | 'M' | 'D' | 'R' | string,
+  ) => {
     const root = rootPath || workingCopyPath;
     if (!opener || !root) return;
+    setOpenError(null);
     void openInVsCode(opener, {
       rootPath: root,
       targetPath,
       repositoryUrl: liveRepo?.repositoryUrl ?? repository?.repositoryUrl,
       repositoryRoot: liveRepo?.repositoryRoot ?? repository?.repositoryRoot,
+      revision,
+      action,
+      svn: svn?.catRevision ? { catRevision: svn.catRevision.bind(svn) } : undefined,
     }).catch((error) => {
       console.error('Failed to open in VS Code', error);
+      setOpenError(toAppError(error, 'Failed to open in VS Code'));
     });
   };
 
@@ -594,11 +620,27 @@ export function RepositoryScreen({
           <ErrorBanner error={noticeError} testId="switch-error" />
         </div>
       ) : null}
+      {openError ? (
+        <div
+          style={{
+            position: 'absolute',
+            top: 12,
+            left: layout.sidebarWidth + 16,
+            right: 16,
+          }}
+        >
+          <ErrorBanner error={openError} testId="open-in-vscode-error" />
+        </div>
+      ) : null}
       {page === 'history' ? (
         <HistoryView
           onRefresh={() => void runHistoryRefresh()}
           diffView={live ? revisionDiffView : fixtureRevisionDiffView(selectedRevision)}
-          onOpenPathInVsCode={opener && (rootPath || workingCopyPath) ? (path) => handleOpenInVsCode(path) : undefined}
+          onOpenPathInVsCode={
+            opener && (rootPath || workingCopyPath)
+              ? (path, rev, action) => handleOpenInVsCode(path, rev, action)
+              : undefined
+          }
         />
       ) : page === 'working-copy' ? (
         <WorkingCopyView

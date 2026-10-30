@@ -100,6 +100,52 @@ describe('Figma 主界面', () => {
     }
   });
 
+  test('从其他页面切到 Changes 时自动刷新 status', async () => {
+    if (!hasNativeTestRenderer) return;
+    const { render, renderer, unmount } = createTestRoot({ width: 1440, height: 960 });
+    try {
+      let statusCalls = 0;
+      render(
+        <RepositoryScreen
+          initialPage="history"
+          repository={liveRepo}
+          svn={{
+            async validateWorkingCopy() {
+              return liveRepo;
+            },
+            async getStatus() {
+              statusCalls += 1;
+              return liveChanges;
+            },
+            async getDiff() {
+              return { kind: 'text' as const, patch: 'diff --git a/src/a.ts b/src/a.ts\n' };
+            },
+          }}
+          workingCopyName="demo-wc"
+          workingCopyPath="~/demo-wc"
+        />,
+      );
+      renderer.flush();
+      await waitFor(() => statusCalls >= 1);
+      const afterOpen = statusCalls;
+
+      simulateClick(renderer, 'nav-changes');
+      await waitFor(() => statusCalls > afterOpen);
+      renderer.flush();
+      expect(renderer.findByTestId('changes-panel')).toBeTruthy();
+
+      simulateClick(renderer, 'nav-history');
+      renderer.flush();
+      const afterLeave = statusCalls;
+      simulateClick(renderer, 'nav-changes');
+      await waitFor(() => statusCalls > afterLeave);
+      renderer.flush();
+      expect(renderer.findByTestId('changes-panel')).toBeTruthy();
+    } finally {
+      unmount();
+    }
+  });
+
   test('History 显示 revision 列表', () => {
     if (!hasNativeTestRenderer) return;
     const { render, renderer, unmount } = createTestRoot({ width: 1440, height: 960 });

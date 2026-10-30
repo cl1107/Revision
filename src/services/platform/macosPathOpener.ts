@@ -31,9 +31,21 @@ export class MacOSPathOpener implements PathOpener {
         argv: ['open', '-b', 'com.microsoft.VSCode', target],
       });
     } catch {
-      await this.runner.run({
-        argv: ['open', '-a', 'Visual Studio Code', target],
-      });
+      try {
+        await this.runner.run({
+          argv: ['open', '-a', 'Visual Studio Code', target],
+        });
+      } catch {
+        try {
+          await this.runner.run({
+            argv: ['open', '-b', 'com.microsoft.VSCodeInsiders', target],
+          });
+        } catch {
+          await this.runner.run({
+            argv: ['open', '-a', 'Visual Studio Code - Insiders', target],
+          });
+        }
+      }
     }
   }
 }

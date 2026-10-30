@@ -44,7 +44,7 @@ export function HistoryView({
 }: {
   onRefresh: () => void;
   diffView?: RevisionDiffView;
-  onOpenPathInVsCode?: (path: string) => void;
+  onOpenPathInVsCode?: (path: string, revision?: number, action?: string) => void;
 }) {
 
   const theme = useTheme();
@@ -270,7 +270,7 @@ export function HistoryView({
                   {onOpenPathInVsCode ? (
                     <OpenInVsCodeButton
                       size="sm"
-                      onClick={() => onOpenPathInVsCode(path.path)}
+                      onClick={() => onOpenPathInVsCode(path.path, selected.revision, path.action)}
                       testId={`history-open-in-vscode-${path.path}`}
                     />
                   ) : null}

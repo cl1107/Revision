@@ -8,6 +8,7 @@ import { checkoutRepository } from './checkout';
 import { CommandRunner } from './commandRunner';
 import { commitWorkingCopy } from './commit';
 import { deleteWorkingCopyPaths } from './delete';
+import { readRevisionCat } from './cat';
 import { readRevisionDiff, readWorkingCopyDiff } from './diff';
 import { readRepositoryInfo, readRemoteHeadRevision } from './info';
 import { revertWorkingCopyPaths } from './revert';
@@ -123,6 +124,20 @@ export class CliSvnClient {
       cwd: rootPath,
       limit: options?.limit,
       signal: options?.signal,
+    });
+  }
+
+  async catRevision(
+    rootPath: string,
+    target: string,
+    revision?: number,
+    signal?: AbortSignal,
+  ): Promise<string> {
+    return readRevisionCat(this.runner, {
+      cwd: rootPath,
+      target,
+      revision,
+      signal,
     });
   }
 }
