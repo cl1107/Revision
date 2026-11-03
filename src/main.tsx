@@ -1,3 +1,4 @@
+import './nativeBinding';
 import { render } from '@gpuix/react';
 import { App, type InitialAppearance } from './app/App';
 import { createMacOSSystemAppearanceService, parseAppearancePreference } from './app/appearance';

@@ -108,19 +108,44 @@ async function buildMacIcon(): Promise<void> {
   await rm(iconset, { recursive: true, force: true });
 }
 
+function findNativeBindingFile(): string | null {
+  const candidates = [
+    path.join(root, 'node_modules', '@gpuix', `native-${process.platform}-${process.arch}`, `gpuix-native.${process.platform}-${process.arch}.node`),
+    path.join(root, 'node_modules', '@gpuix', 'native-darwin-arm64', 'gpuix-native.darwin-arm64.node'),
+    path.join(root, 'node_modules', '@gpuix', 'native-darwin-universal', 'gpuix-native.darwin-universal.node'),
+  ];
+  for (const candidate of candidates) {
+    if (spawnSync('test', ['-f', candidate]).status === 0) return candidate;
+  }
+  return null;
+}
+
 async function wrapMacApp(version: string): Promise<void> {
   await buildMacIcon();
   await rm(appBundle, { recursive: true, force: true });
 
   const macos = path.join(appBundle, 'Contents', 'MacOS');
+  const frameworks = path.join(appBundle, 'Contents', 'Frameworks');
   const resources = path.join(appBundle, 'Contents', 'Resources');
   await mkdir(macos, { recursive: true });
+  await mkdir(frameworks, { recursive: true });
   await mkdir(resources, { recursive: true });
 
   const executable = path.join(macos, 'revision');
   await copyFile(binary, executable);
   await chmod(executable, 0o755);
   await copyFile(icns, path.join(resources, 'AppIcon.icns'));
+
+  const nativeBinding = findNativeBindingFile();
+  if (nativeBinding) {
+    const filename = path.basename(nativeBinding);
+    const inFrameworks = path.join(frameworks, filename);
+    const inMacOS = path.join(macos, filename);
+    await copyFile(nativeBinding, inFrameworks);
+    await copyFile(nativeBinding, inMacOS);
+    run('codesign', ['--force', '--sign', '-', inFrameworks]);
+    run('codesign', ['--force', '--sign', '-', inMacOS]);
+  }
 
   const plist = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -163,6 +188,11 @@ async function main(): Promise<void> {
   await rm(dist, { recursive: true, force: true });
   await mkdir(dist, { recursive: true });
   await compileBinary();
+
+  const nativeBinding = findNativeBindingFile();
+  if (nativeBinding) {
+    await copyFile(nativeBinding, path.join(dist, path.basename(nativeBinding)));
+  }
 
   if (process.platform === 'darwin') {
     run('codesign', ['--force', '--sign', '-', binary]);
