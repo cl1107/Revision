@@ -6,6 +6,7 @@ import { Button } from '../../components/Button';
 import { Checkbox } from '../../components/Checkbox';
 import { ErrorBanner } from '../../components/ErrorBanner';
 import { isCommittable } from '../../domain/change';
+import type { AppError } from '../../domain/error';
 import { canCommit as commitReady } from '../../domain/operation';
 import {
   selectChanges,
@@ -24,9 +25,21 @@ import { ChangeRow } from './ChangeRow';
 export function ChangesPanel({
   onCommit,
   onRefresh,
+  onAiCommit,
+  aiLoading,
+  aiError,
+  onAgyCommit,
+  agyLoading,
+  agyError,
 }: {
   onCommit: () => void;
   onRefresh: () => void;
+  onAiCommit?: () => void;
+  aiLoading?: boolean;
+  aiError?: AppError | null;
+  onAgyCommit?: () => void;
+  agyLoading?: boolean;
+  agyError?: AppError | null;
 }) {
 
   const theme = useTheme();
@@ -178,12 +191,36 @@ export function ChangesPanel({
         </virtual-list>
       )}
 
-      <CommitComposer onCommit={onCommit} />
+      <CommitComposer
+        onCommit={onCommit}
+        onAiCommit={onAiCommit}
+        aiLoading={aiLoading}
+        aiError={aiError}
+        onAgyCommit={onAgyCommit}
+        agyLoading={agyLoading}
+        agyError={agyError}
+      />
     </div>
   );
 }
 
-function CommitComposer({ onCommit }: { onCommit: () => void }) {
+function CommitComposer({
+  onCommit,
+  onAiCommit,
+  aiLoading,
+  aiError,
+  onAgyCommit,
+  agyLoading,
+  agyError,
+}: {
+  onCommit: () => void;
+  onAiCommit?: () => void;
+  aiLoading?: boolean;
+  aiError?: AppError | null;
+  onAgyCommit?: () => void;
+  agyLoading?: boolean;
+  agyError?: AppError | null;
+}) {
   const theme = useTheme();
   const changes = useRepositoryStore(selectChanges);
   const checkedPaths = useRepositoryStore(selectCheckedPaths);
@@ -210,11 +247,48 @@ function CommitComposer({ onCommit }: { onCommit: () => void }) {
         gap: 12,
       }}
     >
-      <text style={{ color: theme.text, fontSize: 13, fontFamily: font.ui, fontWeight: 600 }}>Commit</text>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
+        <text style={{ color: theme.text, fontSize: 13, fontFamily: font.ui, fontWeight: 600 }}>
+          Commit
+        </text>
+        <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          {onAiCommit ? (
+            <Button
+              label={aiLoading ? 'Generating…' : 'AI Commit'}
+              icon="bot"
+              variant="secondary"
+              size="xs"
+              disabled={aiLoading || agyLoading || busy}
+              onClick={onAiCommit}
+              testId="ai-commit-button"
+            />
+          ) : null}
+          {onAgyCommit ? (
+            <Button
+              label={agyLoading ? 'Generating…' : 'Agy Commit'}
+              icon="sparkles"
+              variant="secondary"
+              size="xs"
+              disabled={aiLoading || agyLoading || busy}
+              onClick={onAgyCommit}
+              testId="agy-commit-button"
+            />
+          ) : null}
+        </div>
+      </div>
+      {aiError ? <ErrorBanner error={aiError} testId="ai-commit-error" /> : null}
+      {agyError ? <ErrorBanner error={agyError} testId="agy-commit-error" /> : null}
       <textarea
         testId="commit-message"
         value={commitMessage}
-        placeholder="Commit message…"
+        placeholder={aiLoading || agyLoading ? 'Generating commit message…' : 'Commit message…'}
         onChange={(event) => onCommitMessage(event.value ?? '')}
         onKeyDown={(event) => {
           if (event.key?.toLowerCase() === 'enter' && event.modifiers?.cmd) onCommit();

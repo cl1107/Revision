@@ -1,8 +1,12 @@
+import os from 'node:os';
+import path from 'node:path';
+
 export interface CommandRequest {
   argv: string[];
   cwd?: string;
   signal?: AbortSignal;
   onStdout?: (chunk: string) => void;
+  stdin?: string | Uint8Array;
 }
 
 export interface CommandResult {
@@ -36,11 +40,14 @@ export class CommandError extends Error {
   }
 }
 
+const home = os.homedir();
 const MACOS_COMMAND_PATHS = [
+  path.join(home, '.super.engineering', 'bin'),
+  path.join(home, '.local', 'bin'),
   '/opt/homebrew/bin',
   '/usr/local/bin',
   '/opt/local/bin',
-] as const;
+];
 
 const MACOS_COMMAND_LOCALE = 'en_US.UTF-8';
 
@@ -141,8 +148,16 @@ export class CommandRunner {
         env: commandEnvironment(),
         stdout: 'pipe',
         stderr: 'pipe',
-        stdin: 'ignore',
+        stdin: request.stdin !== undefined ? 'pipe' : 'ignore',
       });
+      if (request.stdin !== undefined && proc.stdin && typeof proc.stdin !== 'number') {
+        try {
+          proc.stdin.write(request.stdin);
+          proc.stdin.end();
+        } catch {
+          // ignore broken pipe if child process exits early
+        }
+      }
     } catch (error) {
       if (isExecutableMissing(error)) {
         throw new CommandError({

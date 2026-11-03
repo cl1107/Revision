@@ -73,4 +73,13 @@ process.stdout.write(result.stdout);`,
       }
     }
   });
+
+  test('支持写入 stdin', async () => {
+    const result = await runner.run({
+      argv: ['cat'],
+      stdin: 'hello stdin',
+    });
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toBe('hello stdin');
+  });
 });

@@ -229,4 +229,222 @@ describe('Commit UI', () => {
       unmount();
     }
   });
+
+  test('Agy Commit 按钮点击后调用 agy 生成提交信息并填入输入框', async () => {
+    if (!hasNativeTestRenderer) return;
+    const { render, renderer, unmount } = createTestRoot({ width: 1440, height: 960 });
+    try {
+      let diffCalled = false;
+      let agyCalled = false;
+      render(
+        <RepositoryScreen
+          repository={repo}
+          workingCopyName="demo-wc"
+          workingCopyPath="~/demo-wc"
+          initialCommitMessage=""
+          operations={new OperationManager()}
+          agy={{
+            async generateCommitMessage(diff) {
+              agyCalled = true;
+              expect(diff).toContain('diff --git');
+              return 'feat(test): auto generated commit';
+            },
+          }}
+          svn={{
+            async validateWorkingCopy() {
+              return repo;
+            },
+            async getStatus() {
+              return changes;
+            },
+            async getDiff() {
+              return { kind: 'text', patch: 'diff --git a/a.ts b/a.ts\n' };
+            },
+            async getWorkingCopyChangesDiff(_root, paths) {
+              diffCalled = true;
+              expect(paths).toEqual(['a.ts']);
+              return 'diff --git a/a.ts b/a.ts\n+hello';
+            },
+          }}
+        />,
+      );
+      renderer.flush();
+      await waitFor(() => Boolean(renderer.findByTestId('change-a.ts')));
+      expect(Boolean(renderer.findByTestId('agy-commit-button'))).toBe(true);
+
+      click(renderer, 'agy-commit-button');
+      await waitFor(() => agyCalled && diffCalled);
+
+      await waitFor(() => {
+        renderer.flush();
+        const input = renderer.findByTestId('commit-message');
+        return input?.customProps?.value === 'feat(test): auto generated commit';
+      });
+    } finally {
+      unmount();
+    }
+  });
+
+  test('Agy Commit 失败时显示错误 banner', async () => {
+    if (!hasNativeTestRenderer) return;
+    const { render, renderer, unmount } = createTestRoot({ width: 1440, height: 960 });
+    try {
+      render(
+        <RepositoryScreen
+          repository={repo}
+          workingCopyName="demo-wc"
+          workingCopyPath="~/demo-wc"
+          initialCommitMessage=""
+          operations={new OperationManager()}
+          agy={{
+            async generateCommitMessage() {
+              throw new Error('网络异常或 agy 进程退出');
+            },
+          }}
+          svn={{
+            async validateWorkingCopy() {
+              return repo;
+            },
+            async getStatus() {
+              return changes;
+            },
+            async getDiff() {
+              return { kind: 'text', patch: 'diff --git a/a.ts b/a.ts\n' };
+            },
+            async getWorkingCopyChangesDiff() {
+              return 'diff --git a/a.ts b/a.ts\n+hello';
+            },
+          }}
+        />,
+      );
+      renderer.flush();
+      await waitFor(() => Boolean(renderer.findByTestId('change-a.ts')));
+
+      click(renderer, 'agy-commit-button');
+      await waitFor(() => {
+        renderer.flush();
+        return Boolean(renderer.findByTestId('agy-commit-error'));
+      });
+
+      expect(renderer.getAllText().join(' ')).toContain('网络异常或 agy 进程退出');
+    } finally {
+      unmount();
+    }
+  });
+
+  test('AI Commit 按钮点击后通过自定义 AI Provider 生成提交信息', async () => {
+    if (!hasNativeTestRenderer) return;
+    const { render, renderer, unmount } = createTestRoot({ width: 1440, height: 960 });
+    try {
+      let aiCalled = false;
+      render(
+        <RepositoryScreen
+          repository={repo}
+          workingCopyName="demo-wc"
+          workingCopyPath="~/demo-wc"
+          initialCommitMessage=""
+          operations={new OperationManager()}
+          aiSettings={{
+            endpoint: 'https://api.openai.com/v1',
+            apiKey: 'sk-test',
+            model: 'gpt-4o',
+          }}
+          ai={{
+            async listModels() {
+              return ['gpt-4o'];
+            },
+            async generateCommitMessage(input) {
+              aiCalled = true;
+              expect(input.model).toBe('gpt-4o');
+              expect(input.diff).toContain('diff --git');
+              return 'feat(ai): custom openai generated commit';
+            },
+          }}
+          svn={{
+            async validateWorkingCopy() {
+              return repo;
+            },
+            async getStatus() {
+              return changes;
+            },
+            async getDiff() {
+              return { kind: 'text', patch: 'diff --git a/a.ts b/a.ts\n' };
+            },
+            async getWorkingCopyChangesDiff() {
+              return 'diff --git a/a.ts b/a.ts\n+hello';
+            },
+          }}
+        />,
+      );
+      renderer.flush();
+      await waitFor(() => Boolean(renderer.findByTestId('change-a.ts')));
+      expect(Boolean(renderer.findByTestId('ai-commit-button'))).toBe(true);
+
+      click(renderer, 'ai-commit-button');
+      await waitFor(() => aiCalled);
+
+      await waitFor(() => {
+        renderer.flush();
+        const input = renderer.findByTestId('commit-message');
+        return input?.customProps?.value === 'feat(ai): custom openai generated commit';
+      });
+    } finally {
+      unmount();
+    }
+  });
+
+  test('AI Commit 未配置模型时展示提示错误', async () => {
+    if (!hasNativeTestRenderer) return;
+    const { render, renderer, unmount } = createTestRoot({ width: 1440, height: 960 });
+    try {
+      render(
+        <RepositoryScreen
+          repository={repo}
+          workingCopyName="demo-wc"
+          workingCopyPath="~/demo-wc"
+          initialCommitMessage=""
+          operations={new OperationManager()}
+          aiSettings={{
+            endpoint: '',
+            apiKey: '',
+            model: '',
+          }}
+          ai={{
+            async listModels() {
+              return [];
+            },
+            async generateCommitMessage() {
+              return '';
+            },
+          }}
+          svn={{
+            async validateWorkingCopy() {
+              return repo;
+            },
+            async getStatus() {
+              return changes;
+            },
+            async getDiff() {
+              return { kind: 'text', patch: 'diff --git a/a.ts b/a.ts\n' };
+            },
+            async getWorkingCopyChangesDiff() {
+              return 'diff --git a/a.ts b/a.ts\n+hello';
+            },
+          }}
+        />,
+      );
+      renderer.flush();
+      await waitFor(() => Boolean(renderer.findByTestId('change-a.ts')));
+
+      click(renderer, 'ai-commit-button');
+      await waitFor(() => {
+        renderer.flush();
+        return Boolean(renderer.findByTestId('ai-commit-error'));
+      });
+
+      expect(renderer.getAllText().join(' ')).toContain('未配置 AI 模型');
+    } finally {
+      unmount();
+    }
+  });
 });

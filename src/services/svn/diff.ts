@@ -63,3 +63,27 @@ export async function readRevisionDiff(
 
   return classifyRevisionDiffOutput(result.stdout, result.stderr);
 }
+
+export async function readWorkingCopyChangesDiff(
+  runner: CommandRunner,
+  input: { cwd: string; paths?: string[]; signal?: AbortSignal },
+): Promise<string> {
+  const argv =
+    input.paths && input.paths.length > 0
+      ? ['svn', 'diff', '--git', '--', ...input.paths]
+      : ['svn', 'diff', '--git'];
+  try {
+    const result = await runner.run({
+      argv,
+      cwd: input.cwd,
+      signal: input.signal,
+    });
+    return result.stdout;
+  } catch (error) {
+    if (error instanceof CommandError) {
+      if (error.message === 'aborted') throw error;
+      if (error.stdout.trim().length > 0) return error.stdout;
+    }
+    throw error;
+  }
+}

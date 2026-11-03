@@ -19,6 +19,9 @@ import {
 import type { OperationManager } from '../../application/operationManager';
 import { refreshWorkingCopy, type WorkingCopyReader } from '../../application/refreshRepository';
 import { openInVsCode, type RevisionSnapshotProvider } from '../../application/openInVsCode';
+import type { AgyClient } from '../../services/agy/AgyClient';
+import type { AiClient } from '../../services/ai/openaiClient';
+import type { AiSettings } from '../../services/settings/settingsRepository';
 import type { PathOpener } from '../../services/platform/pathOpener';
 import { Dialog } from '../../components/Dialog';
 import { ErrorBanner } from '../../components/ErrorBanner';
@@ -63,6 +66,10 @@ import type { RepositoryPage } from '../../domain/repositoryPage';
 import { Sidebar } from './Sidebar';
 import { WorkingCopyView } from './WorkingCopyView';
 
+export interface WorkingCopyChangesDiffReader {
+  getWorkingCopyChangesDiff(rootPath: string, paths?: string[], signal?: AbortSignal): Promise<string>;
+}
+
 export type RepositorySvn = WorkingCopyReader &
   DiffReader &
   Partial<
@@ -70,7 +77,8 @@ export type RepositorySvn = WorkingCopyReader &
       WorkingCopyMutator &
       HistoryReader &
       RevisionDiffReader &
-      RevisionSnapshotProvider
+      RevisionSnapshotProvider &
+      WorkingCopyChangesDiffReader
   >;
 
 type ConfirmKind = 'revert' | 'delete';
@@ -85,6 +93,10 @@ export function RepositoryScreen({
   svn,
   operations,
   opener,
+  agy,
+  ai,
+  aiSettings,
+  onOpenSettings,
   initialCommitMessage,
   recents,
   noticeError,
@@ -99,6 +111,10 @@ export function RepositoryScreen({
   svn?: RepositorySvn;
   operations?: OperationManager;
   opener?: PathOpener;
+  agy?: AgyClient;
+  ai?: AiClient;
+  aiSettings?: AiSettings;
+  onOpenSettings?: () => void;
   initialCommitMessage?: string;
   recents?: RecentItem[];
   noticeError?: AppError | null;
@@ -478,6 +494,149 @@ export function RepositoryScreen({
     })();
   };
 
+  const [agyLoading, setAgyLoading] = useState(false);
+  const [agyError, setAgyError] = useState<AppError | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<AppError | null>(null);
+
+  const runAiCommit = useCallback(async () => {
+    if (aiLoading || agyLoading || mutating !== null || operations?.running) return;
+    setAiError(null);
+
+    if (!aiSettings?.model?.trim()) {
+      setAiError({
+        kind: 'unknown',
+        title: 'AI Commit',
+        message: '未配置 AI 模型。请点击右上角设置配置 endpoint、API Key 并选择模型。',
+      });
+      return;
+    }
+
+    const snapshot = store.getState();
+    const checkedCommittable = snapshot.changes.filter(
+      (change) => snapshot.checkedPaths.has(change.path) && isCommittable(change),
+    );
+    const targetPaths = (
+      checkedCommittable.length > 0
+        ? checkedCommittable
+        : snapshot.changes.filter(isCommittable)
+    ).map((c) => c.path);
+
+    if (targetPaths.length === 0) {
+      setAiError({
+        kind: 'unknown',
+        title: 'AI Commit',
+        message: '当前工作副本没有可提交的变更文件（请先添加或修改文件）。',
+      });
+      return;
+    }
+
+    if (!live || !rootPath || !svn || !ai) {
+      if (!live) {
+        setAiLoading(true);
+        setTimeout(() => {
+          store.getState().setCommitMessage(
+            'feat(core): 支持基于自定义 AI Provider 自动生成提交信息\n\n- 集成 OpenAI 兼容接口生成规范提交信息',
+          );
+          setAiLoading(false);
+        }, 500);
+        return;
+      }
+      setAiError({
+        kind: 'unknown',
+        title: 'AI Commit',
+        message: '未连接工作副本或 SVN/AI 服务不可用。',
+      });
+      return;
+    }
+
+    setAiLoading(true);
+    try {
+      const diff = await svn.getWorkingCopyChangesDiff?.(rootPath, targetPaths);
+      if (!diff || !diff.trim()) {
+        setAiError({
+          kind: 'unknown',
+          title: 'AI Commit',
+          message: '所选文件未产生文本差异，无法生成提交信息。',
+        });
+        return;
+      }
+      const message = await ai.generateCommitMessage({
+        diff,
+        endpoint: aiSettings.endpoint,
+        apiKey: aiSettings.apiKey,
+        model: aiSettings.model,
+      });
+      store.getState().setCommitMessage(message);
+    } catch (error) {
+      setAiError(toAppError(error, 'AI Commit 失败'));
+    } finally {
+      setAiLoading(false);
+    }
+  }, [aiLoading, agyLoading, mutating, operations, aiSettings, store, live, rootPath, svn, ai]);
+
+  const runAgyCommit = useCallback(async () => {
+    if (agyLoading || mutating !== null || operations?.running) return;
+    setAgyError(null);
+
+    const snapshot = store.getState();
+    const checkedCommittable = snapshot.changes.filter(
+      (change) => snapshot.checkedPaths.has(change.path) && isCommittable(change),
+    );
+    const targetPaths = (
+      checkedCommittable.length > 0
+        ? checkedCommittable
+        : snapshot.changes.filter(isCommittable)
+    ).map((c) => c.path);
+
+    if (targetPaths.length === 0) {
+      setAgyError({
+        kind: 'unknown',
+        title: 'Agy Commit',
+        message: '当前工作副本没有可提交的变更文件（请先添加或修改文件）。',
+      });
+      return;
+    }
+
+    if (!live || !rootPath || !svn || !agy) {
+      if (!live) {
+        setAgyLoading(true);
+        setTimeout(() => {
+          store.getState().setCommitMessage(
+            'feat(core): 支持基于 agy 自动生成提交信息\n\n- 集成 agy CLI 生成 Conventional Commits 规范的提交信息',
+          );
+          setAgyLoading(false);
+        }, 500);
+        return;
+      }
+      setAgyError({
+        kind: 'unknown',
+        title: 'Agy Commit',
+        message: '未连接工作副本或 SVN/Agy 服务不可用。',
+      });
+      return;
+    }
+
+    setAgyLoading(true);
+    try {
+      const diff = await svn.getWorkingCopyChangesDiff?.(rootPath, targetPaths);
+      if (!diff || !diff.trim()) {
+        setAgyError({
+          kind: 'unknown',
+          title: 'Agy Commit',
+          message: '所选文件未产生文本差异，无法生成提交信息。',
+        });
+        return;
+      }
+      const message = await agy.generateCommitMessage(diff);
+      store.getState().setCommitMessage(message);
+    } catch (error) {
+      setAgyError(toAppError(error, 'Agy Commit 失败'));
+    } finally {
+      setAgyLoading(false);
+    }
+  }, [agyLoading, mutating, operations, store, live, rootPath, svn, agy]);
+
   const requestConfirm = (kind: ConfirmKind, targets: WorkingCopyChange[]) => {
     if (store.getState().mutating !== null || operations?.running || targets.length === 0) return;
     setConfirm({ kind, targets });
@@ -657,6 +816,12 @@ export function RepositoryScreen({
           <ChangesPanel
             onCommit={runCommit}
             onRefresh={() => void runRefresh()}
+            onAiCommit={runAiCommit}
+            aiLoading={aiLoading}
+            aiError={aiError}
+            onAgyCommit={runAgyCommit}
+            agyLoading={agyLoading}
+            agyError={agyError}
           />
           <DiffPanel
             change={selectedChange}

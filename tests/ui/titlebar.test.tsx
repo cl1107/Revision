@@ -183,4 +183,23 @@ describe('Titlebar', () => {
       unmount();
     }
   });
+
+  test('Titlebar 点击 Settings 按钮触发 onOpenSettings', () => {
+    if (!hasNativeTestRenderer) return;
+    const { render, renderer, unmount } = createTestRoot({ width: 900, height: 60 });
+    try {
+      let settingsOpened = false;
+      render(
+        <AppearanceHarness>
+          <Titlebar onOpenSettings={() => { settingsOpened = true; }} />
+        </AppearanceHarness>,
+      );
+      renderer.flush();
+      expect(Boolean(renderer.findByTestId('titlebar-settings'))).toBe(true);
+      click(renderer, 'titlebar-settings');
+      expect(settingsOpened).toBe(true);
+    } finally {
+      unmount();
+    }
+  });
 });

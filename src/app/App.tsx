@@ -13,6 +13,8 @@ import type { AppError } from '../domain/error';
 import { lastOutputLine } from '../domain/operation';
 import type { Repository } from '../domain/repository';
 import { CheckoutDialog } from '../features/welcome/CheckoutDialog';
+import { SettingsDialog } from '../features/settings/SettingsDialog';
+import type { AiSettings } from '../services/settings/settingsRepository';
 import { detectSvn } from '../services/svn/detectSvn';
 import {
   createMacOSSystemAppearanceService,
@@ -160,10 +162,22 @@ function AppShell({
   const [checkoutDest, setCheckoutDest] = useState('');
   const [checkoutProgress, setCheckoutProgress] = useState('');
   const [checkoutError, setCheckoutError] = useState<AppError | null>(null);
+  const [aiSettings, setAiSettings] = useState<AiSettings | undefined>(undefined);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const busyRef = useRef(false);
   const svnRef = useRef<SvnProbe>(svn);
   svnRef.current = svn;
   const autoOpenAttemptedRef = useRef(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void services.settings.load().then((settings) => {
+      if (!cancelled) setAiSettings(settings.ai);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [services.settings]);
 
   const svnVersion = svn.status === 'available' ? svn.version : undefined;
   const previewRecents = process.env.SVN_GPUIX_PREVIEW === 'welcome' ? fixtureRecents : recents;
@@ -338,15 +352,28 @@ function AppShell({
         showWelcome={!preview && Boolean(repository)}
         onOpenWorkingCopy={preview ? undefined : () => void chooseFolder()}
         onWelcomeScreen={!preview && repository ? closeWorkingCopy : undefined}
+        onOpenSettings={() => setSettingsOpen(true)}
       />
       {preview ? (
-        <RepositoryScreen initialPage={preview} svnVersion={svnVersion} opener={services.opener} />
+        <RepositoryScreen
+          initialPage={preview}
+          svnVersion={svnVersion}
+          opener={services.opener}
+          agy={services.agy}
+          ai={services.ai}
+          aiSettings={aiSettings}
+          onOpenSettings={() => setSettingsOpen(true)}
+        />
       ) : repository ? (
         <RepositoryScreen
           repository={repository}
           svn={services.svn}
           operations={services.operations}
           opener={services.opener}
+          agy={services.agy}
+          ai={services.ai}
+          aiSettings={aiSettings}
+          onOpenSettings={() => setSettingsOpen(true)}
           workingCopyName={basename(repository.rootPath) || repository.rootPath}
           workingCopyPath={displayPath(repository.rootPath, homedir())}
           revision={repository.revision}
@@ -383,6 +410,20 @@ function AppShell({
             }
           }}
           onCheckout={() => void runCheckout()}
+        />
+      ) : null}
+      {settingsOpen ? (
+        <SettingsDialog
+          initialSettings={aiSettings}
+          aiClient={services.ai}
+          onSave={(newSettings) => {
+            setAiSettings(newSettings);
+            setSettingsOpen(false);
+            void services.settings.setAiSettings(newSettings).catch((err: unknown) => {
+              console.error('Failed to save AI settings', err);
+            });
+          }}
+          onCancel={() => setSettingsOpen(false)}
         />
       ) : null}
     </div>

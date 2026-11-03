@@ -5,6 +5,12 @@ import { homedir } from 'node:os';
 import { upsertRecent, type RecentWorkingCopy } from '../../domain/repository';
 import { parseAppearancePreference, type AppearancePreference } from '../../app/appearance';
 
+export interface AiSettings {
+  endpoint?: string;
+  apiKey?: string;
+  model?: string;
+}
+
 export interface Settings {
   version: 1;
   recentWorkingCopies: RecentWorkingCopy[];
@@ -14,6 +20,7 @@ export interface Settings {
     width: number;
     height: number;
   };
+  ai?: AiSettings;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -25,6 +32,15 @@ function parseRecent(value: unknown): RecentWorkingCopy | null {
   if (typeof value.path !== 'string' || value.path.length === 0) return null;
   if (typeof value.lastOpenedAt !== 'number' || !Number.isFinite(value.lastOpenedAt)) return null;
   return { path: value.path, lastOpenedAt: value.lastOpenedAt };
+}
+
+function parseAiSettings(raw: unknown): AiSettings | undefined {
+  if (!isRecord(raw)) return undefined;
+  return {
+    endpoint: typeof raw.endpoint === 'string' ? raw.endpoint : undefined,
+    apiKey: typeof raw.apiKey === 'string' ? raw.apiKey : undefined,
+    model: typeof raw.model === 'string' ? raw.model : undefined,
+  };
 }
 
 export function defaultSettings(): Settings {
@@ -58,6 +74,11 @@ export function parseSettings(raw: unknown): Settings {
     if (typeof width === 'number' && typeof height === 'number') {
       settings.window = { width, height };
     }
+  }
+
+  const ai = parseAiSettings(raw.ai);
+  if (ai) {
+    settings.ai = ai;
   }
 
   return settings;
@@ -140,5 +161,9 @@ export class SettingsRepository {
 
   setAppearance(appearance: AppearancePreference): Promise<Settings> {
     return this.mutate((current) => ({ ...current, appearance }));
+  }
+
+  setAiSettings(ai: AiSettings): Promise<Settings> {
+    return this.mutate((current) => ({ ...current, ai }));
   }
 }

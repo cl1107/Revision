@@ -1,3 +1,4 @@
+import botSvg from 'lucide-static/icons/bot.svg' with { type: 'text' };
 import chevronDownSvg from 'lucide-static/icons/chevron-down.svg' with { type: 'text' };
 import chevronUpSvg from 'lucide-static/icons/chevron-up.svg' with { type: 'text' };
 import copySvg from 'lucide-static/icons/copy.svg' with { type: 'text' };
@@ -9,6 +10,8 @@ import houseSvg from 'lucide-static/icons/house.svg' with { type: 'text' };
 import menuSvg from 'lucide-static/icons/menu.svg' with { type: 'text' };
 import plusSvg from 'lucide-static/icons/plus.svg' with { type: 'text' };
 import searchSvg from 'lucide-static/icons/search.svg' with { type: 'text' };
+import settingsSvg from 'lucide-static/icons/settings.svg' with { type: 'text' };
+import sparklesSvg from 'lucide-static/icons/sparkles.svg' with { type: 'text' };
 import trashSvg from 'lucide-static/icons/trash.svg' with { type: 'text' };
 import undoSvg from 'lucide-static/icons/undo.svg' with { type: 'text' };
 
@@ -37,6 +40,9 @@ export const icons = {
   chevronUp: lucideSource(chevronUpSvg),
   trash: lucideSource(trashSvg),
   menu: lucideSource(menuSvg),
+  sparkles: lucideSource(sparklesSvg),
+  bot: lucideSource(botSvg),
+  settings: lucideSource(settingsSvg),
 } as const;
 
 export type IconName = keyof typeof icons;

@@ -14,11 +14,13 @@ export function Titlebar({
   showWelcome,
   onOpenWorkingCopy,
   onWelcomeScreen,
+  onOpenSettings,
 }: {
   canOpen?: boolean;
   showWelcome?: boolean;
   onOpenWorkingCopy?: () => void;
   onWelcomeScreen?: () => void;
+  onOpenSettings?: () => void;
 }) {
   const theme = useTheme();
   const { preference, setPreference } = useAppearance();
@@ -82,6 +84,16 @@ export function Titlebar({
           );
         })}
       </div>
+      {onOpenSettings ? (
+        <Button
+          label="Settings"
+          icon="settings"
+          variant="secondary"
+          size="sm"
+          onClick={onOpenSettings}
+          testId="titlebar-settings"
+        />
+      ) : null}
       {onOpenWorkingCopy ? (
         <Button
           label="Open working copy"

@@ -19,6 +19,7 @@
     "@gpuix/react": "0.11.0",
     "fast-xml-parser": "^5.11.2",
     "lucide-static": "^1.66.0",
+    "openai": "^7.47.0",
     "react": "^19.3.0",
     "zustand": "5.0.16"
   },

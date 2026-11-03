@@ -9,7 +9,7 @@ import { CommandRunner } from './commandRunner';
 import { commitWorkingCopy } from './commit';
 import { deleteWorkingCopyPaths } from './delete';
 import { readRevisionCat } from './cat';
-import { readRevisionDiff, readWorkingCopyDiff } from './diff';
+import { readRevisionDiff, readWorkingCopyChangesDiff, readWorkingCopyDiff } from './diff';
 import { readRepositoryInfo, readRemoteHeadRevision } from './info';
 import { revertWorkingCopyPaths } from './revert';
 import { readRevisionLog } from './log';
@@ -56,6 +56,14 @@ export class CliSvnClient {
 
   async getDiff(rootPath: string, path: string, signal?: AbortSignal): Promise<DiffResult> {
     return readWorkingCopyDiff(this.runner, { cwd: rootPath, path, signal });
+  }
+
+  async getWorkingCopyChangesDiff(
+    rootPath: string,
+    paths?: string[],
+    signal?: AbortSignal,
+  ): Promise<string> {
+    return readWorkingCopyChangesDiff(this.runner, { cwd: rootPath, paths, signal });
   }
 
   async getRevisionDiff(

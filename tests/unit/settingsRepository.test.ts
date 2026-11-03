@@ -83,4 +83,23 @@ describe('SettingsRepository', () => {
     expect(cleared.recentWorkingCopies.map((item) => item.path)).toEqual(['/wc/a']);
     expect((await repo.load()).lastWorkingCopy).toBeUndefined();
   });
+
+  test('setAiSettings 持久化 AI 配置', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'svn-gpuix-settings-'));
+    const filePath = join(dir, 'settings.json');
+    const repo = new SettingsRepository(filePath);
+
+    await repo.setAiSettings({
+      endpoint: 'https://my-llm.com/v1',
+      apiKey: 'sk-12345',
+      model: 'my-model',
+    });
+
+    const loaded = await repo.load();
+    expect(loaded.ai).toEqual({
+      endpoint: 'https://my-llm.com/v1',
+      apiKey: 'sk-12345',
+      model: 'my-model',
+    });
+  });
 });
