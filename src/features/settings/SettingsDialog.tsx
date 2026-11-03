@@ -22,11 +22,15 @@ export function SettingsDialog({
   const [endpoint, setEndpoint] = useState(initialSettings?.endpoint ?? 'https://api.openai.com/v1');
   const [apiKey, setApiKey] = useState(initialSettings?.apiKey ?? '');
   const [model, setModel] = useState(initialSettings?.model ?? '');
+  const [modelFilter, setModelFilter] = useState('');
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [fetchingModels, setFetchingModels] = useState(false);
   const [error, setError] = useState<AppError | null>(null);
 
   const fieldStyle = createFieldStyle(theme);
+  const visibleModels = modelFilter.trim()
+    ? availableModels.filter((m) => m.toLowerCase().includes(modelFilter.trim().toLowerCase()))
+    : availableModels;
 
   const handleFetchModels = async () => {
     if (!aiClient || fetchingModels) return;
@@ -135,26 +139,50 @@ export function SettingsDialog({
 
         {availableModels.length > 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <text style={{ color: theme.textMuted, fontSize: 11, fontFamily: font.ui }}>
-              {`可用模型 (${availableModels.length} 个，点击选择):`}
-            </text>
+            <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <text style={{ color: theme.textMuted, fontSize: 11, fontFamily: font.ui }}>
+                {`可用模型 (${availableModels.length} 个，点击选择):`}
+              </text>
+              {availableModels.length > 6 ? (
+                <input
+                  testId="settings-model-filter"
+                  value={modelFilter}
+                  placeholder="过滤模型…"
+                  onChange={(event) => setModelFilter(event.value ?? '')}
+                  style={{
+                    height: 24,
+                    width: 140,
+                    paddingLeft: 8,
+                    paddingRight: 8,
+                    borderRadius: 6,
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                    backgroundColor: theme.bg,
+                    color: theme.text,
+                    fontSize: 11,
+                  }}
+                />
+              ) : null}
+            </div>
             <div
               testId="settings-model-list"
               style={{
-                maxHeight: 120,
+                height: 140,
+                minHeight: 0,
                 borderWidth: 1,
                 borderColor: theme.border,
                 borderRadius: 8,
                 backgroundColor: theme.bg,
-                padding: 6,
+                padding: 8,
                 display: 'flex',
                 flexDirection: 'row',
                 flexWrap: 'wrap',
+                alignContent: 'flex-start',
                 gap: 6,
-                overflow: 'hidden',
+                overflow: 'scroll',
               }}
             >
-              {availableModels.slice(0, 16).map((m) => {
+              {visibleModels.map((m) => {
                 const isSelected = model === m;
                 return (
                   <div
@@ -186,6 +214,11 @@ export function SettingsDialog({
                   </div>
                 );
               })}
+              {visibleModels.length === 0 ? (
+                <text style={{ color: theme.textMuted, fontSize: 11, fontFamily: font.ui, padding: 8 }}>
+                  未找到匹配的模型
+                </text>
+              ) : null}
             </div>
           </div>
         ) : null}

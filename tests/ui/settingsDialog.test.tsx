@@ -87,4 +87,55 @@ describe('SettingsDialog', () => {
       unmount();
     }
   });
+
+  test('支持获取大量模型并可完整显示和选择', async () => {
+    if (!hasNativeTestRenderer) return;
+    const { render, renderer, unmount } = createTestRoot({ width: 800, height: 600 });
+    try {
+      const mockModels = Array.from({ length: 30 }, (_, i) => `model-option-${i}`);
+      const mockAiClient: AiClient = {
+        async listModels() {
+          return mockModels;
+        },
+        async generateCommitMessage() {
+          return '';
+        },
+      };
+
+      let savedModel = '';
+      render(
+        <SettingsDialog
+          aiClient={mockAiClient}
+          onSave={(cfg) => {
+            savedModel = cfg.model || '';
+          }}
+          onCancel={() => {}}
+        />,
+      );
+      renderer.flush();
+
+      click(renderer, 'settings-fetch-models');
+      await Bun.sleep(50);
+      renderer.flush();
+
+      // Ensure model beyond index 16 exists
+      const target = renderer.findByTestId('model-option-model-option-25');
+      expect(Boolean(target)).toBe(true);
+
+      if (target) {
+        renderer.scrollIntoView(target.id);
+        renderer.flush();
+      }
+
+      click(renderer, 'model-option-model-option-25');
+      renderer.flush();
+
+      click(renderer, 'settings-save');
+      renderer.flush();
+
+      expect(savedModel).toBe('model-option-25');
+    } finally {
+      unmount();
+    }
+  });
 });
