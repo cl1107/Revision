@@ -161,27 +161,16 @@ function AppShell({
   const [checkoutProgress, setCheckoutProgress] = useState('');
   const [checkoutError, setCheckoutError] = useState<AppError | null>(null);
   const busyRef = useRef(false);
+  const svnRef = useRef<SvnProbe>(svn);
+  svnRef.current = svn;
+  const autoOpenAttemptedRef = useRef(false);
 
   const svnVersion = svn.status === 'available' ? svn.version : undefined;
   const previewRecents = process.env.SVN_GPUIX_PREVIEW === 'welcome' ? fixtureRecents : recents;
 
-  useEffect(() => {
-    let cancelled = false;
-    detectSvn(services.runner).then((result) => {
-      if (!cancelled) setSvn(result);
-    });
-    services.settings.load().then(async (settings) => {
-      if (cancelled) return;
-      setRecents(await presentRecents(settings.recentWorkingCopies));
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [services]);
-
   const openPath = useCallback(
     async (path: string, options?: { keepCurrentOnError?: boolean }) => {
-      if (busyRef.current || svn.status !== 'available' || services.operations.running) return;
+      if (busyRef.current || svnRef.current.status !== 'available' || services.operations.running) return;
       busyRef.current = true;
       setBusy(true);
       setOpenError(null);
@@ -205,15 +194,47 @@ function AppShell({
       busyRef.current = false;
       setBusy(false);
     },
-    [services, svn.status],
+    [services],
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const [svnResult, settings] = await Promise.all([
+        detectSvn(services.runner),
+        services.settings.load(),
+      ]);
+      if (cancelled) return;
+      svnRef.current = svnResult;
+      setSvn(svnResult);
+      setRecents(await presentRecents(settings.recentWorkingCopies));
+
+      if (
+        !autoOpenAttemptedRef.current &&
+        !preview &&
+        !process.env.SVN_GPUIX_PREVIEW &&
+        svnResult.status === 'available' &&
+        settings.lastWorkingCopy
+      ) {
+        autoOpenAttemptedRef.current = true;
+        await openPath(settings.lastWorkingCopy);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [openPath, preview, services]);
 
   const closeWorkingCopy = useCallback(() => {
     if (busyRef.current || services.operations.running) return;
     setRepository(null);
     setOpenError(null);
     setSwitchError(null);
-  }, [services.operations]);
+    void services.settings.clearLastWorkingCopy().catch((error) => {
+      console.error('Failed to clear last working copy', error);
+    });
+  }, [services.operations, services.settings]);
 
   const chooseFolder = useCallback(async () => {
     if (busyRef.current || svn.status !== 'available' || services.operations.running) return;

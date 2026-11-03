@@ -69,4 +69,18 @@ describe('SettingsRepository', () => {
     expect(loaded.lastWorkingCopy).toBe('/wc/b');
     expect(loaded.recentWorkingCopies.map((item) => item.path)).toEqual(['/wc/b', '/wc/a']);
   });
+
+  test('clearLastWorkingCopy 清除上次工作区记录但保留 recents', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'svn-gpuix-settings-'));
+    const filePath = join(dir, 'settings.json');
+    const repo = new SettingsRepository(filePath);
+
+    await repo.rememberWorkingCopy('/wc/a', 1);
+    expect((await repo.load()).lastWorkingCopy).toBe('/wc/a');
+
+    const cleared = await repo.clearLastWorkingCopy();
+    expect(cleared.lastWorkingCopy).toBeUndefined();
+    expect(cleared.recentWorkingCopies.map((item) => item.path)).toEqual(['/wc/a']);
+    expect((await repo.load()).lastWorkingCopy).toBeUndefined();
+  });
 });

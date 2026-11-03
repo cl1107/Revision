@@ -130,6 +130,14 @@ export class SettingsRepository {
     }));
   }
 
+  clearLastWorkingCopy(): Promise<Settings> {
+    return this.mutate((current) => {
+      const next: Settings = { ...current };
+      delete next.lastWorkingCopy;
+      return next;
+    });
+  }
+
   setAppearance(appearance: AppearancePreference): Promise<Settings> {
     return this.mutate((current) => ({ ...current, appearance }));
   }
